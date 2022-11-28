@@ -1,8 +1,8 @@
-
 # 목차
 
 - [객체 생성과 파괴](#객체-생성과-파괴)
   - 아이템 1. 생성자 대신 정적 패터리 메서드를 고려하라
+  - 아이템 2. 생성자에 매개변수가 많다면 빌더를 고려하라
 - [모든 객체의 공통 메서드](#모든-객체의-공통-메서드)
   - 아이템 11. equals를 재정의하려거든 hashCode도 재정의하라
 - [일반적인 프로그래밍 원칙](#일반적인-프로그래밍-원칙)
@@ -10,9 +10,9 @@
 
 ---
 
-## 객체 생성과 파괴
+# 객체 생성과 파괴
 
-### 아이템 1. 생성자 대신 정적 팩터리 메서드를 고려하라
+## 아이템 1. 생성자 대신 정적 팩터리 메서드를 고려하라
 
 클래스의 인스턴스를 얻기 위해서는 `public` 생성자를 사용하는 것이 일반적이나, 생성자와 별도로
 해당하는 클래스의 인스턴스를 반환하는 정적 팩터리 메서드를 제공할 수 있다. `boolean` 기본 타입의 
@@ -29,7 +29,7 @@
 > valueOf() 메서드를 호출하면 이들을 반환한다. public 생성자를 사용하는 방법 또한 존재하지만,
 > java9 버전 부터 Deprecated 되었다.
 
-#### 정적 팩터리 메서드의 장점
+### 정적 팩터리 메서드의 장점
 
 1. 이름을 가질 수 있다.
     - 반환될 객체의 특징을 더 상세히 설명할 수 있다.
@@ -40,12 +40,12 @@
 4. 입력 매개변수에 따라 매번 다른 클래스의 객체를 반환할 수 있다.
 5. 정적 팩터리 메서드를 작성하는 시점에는 반환할 객체의 클래스가 존재하지 않아도 된다.
 
-#### 정적 팩터리 메서드의 단점
+### 정적 팩터리 메서드의 단점
 
 1. 상속을 하려면 `public` 또는 `protected` 생성자가 필요하기 때문에 정적 팩터리 메서드만 제공하면 하위 클래스를 만들 수 없다.
 2. 정적 팩터리 메서드는 프로그래머가 찾기 어렵다.
 
-#### 정적 팩터리 메서드 명명 방식
+### 정적 팩터리 메서드 명명 방식
 
 1. `from`: 매개변수 하나를 받아 해당 타입의 인스턴스를 반환하는 형변환 메서드
 2. `of`: 여러 매개변수를 받아 적합한 타입의 인스턴스를 반환하는 집계 메서드
@@ -61,14 +61,169 @@
 
 ---
 
-## 모든 객체의 공통 메서드
+## 아이템 2. 생성자에 매개변수가 많다면 빌더를 고려하라
 
-### 아이템 11. equals를 재정의하려거든 hashCode도 재정의하라
+### 점층적 생성자 패턴
+
+정적 팩터리와 생성자에는 선택적 매개변수가 많을 때 적절히 대응하기 어렵다. 클래스의 선택적 매개변수가 존재할때
+가장 간단한 방법은 `점층적 생성자 패턴`이다. 선택적 매개변수를 1개만 받는 생성자, 2개만 받는 생성자, 3개만 받는 생성자...
+의 형태로 생성자를 늘려나가는 방식이다. 
+
+```java
+    // 점층적 생성자 패턴
+    public User(Long id, String name, String email, String address, Long phoneNumber) {
+    ...
+    }
+    public User(Long id, String name, String email, Long phoneNumber) {
+    ...
+    }
+
+    public User(Long id, String name, String email, String address) {
+    ...
+    }
+
+    public User(Long id, String name, String email) {
+    ...
+    }
+```
+
+`점층적 생성자 패턴`은 구현 방법은 간단하지만 
+1. 매개변수와 선택적 매개변수의 수가 늘어날 수록 생성자의 개수가 늘어날 수 있고
+2. 이에 따라 생성자를 호출하는 코드를 작성하기 복잡해진다. 
+
+### 자바빈즈 패턴
+
+두 번째 방법은 자바빈즈 패턴이다. 매개변수가 없는 생성자로 객체를 생성하고 `setter` 메서드를 정의해 
+매개변수의 값들을 설정한다.
+
+```java
+    public User() {}
+
+    public void setId(Long id) {
+        ...
+    }
+    
+    public void setName(String name) {
+        ...
+    }
+    
+    public void setEmail(String email) {
+        ... 
+    }
+    
+    public void setAddress(String address) {
+        ...
+    }
+    
+    public void setPhoneNumber(Long phoneNumber) {
+       ...
+    }
+    
+    ...
+```
+
+`점층적 생성자 패턴`에서의 단점인 생성자의 개수가 늘어나거나, 호출하는 코드가 복잡해지는 등의 단점은 `자바빈즈 패턴`에서는
+해소가 되었다. 하지만, 
+1. 객체 하나를 생성하기 위해서는 메서드의 호출이 여러번 일어나야 하고 
+2. 객체가 완성되기 전까지 일관성이 무너진 상태에 놓이게 된다.
+3. 상태 변화를 허용하기 때문에 불변 객체로 만들 수 없다.
+4. 스레드 안정성을 얻으려면 추가 작업이 필요하다.
+
+### 빌더 패턴
+
+`빌더패턴`은 `점층적 생성자 패턴`의 안정성과 `자바빈즈 패턴`의 가독성을 겸비한 패턴이다. 클라이언트가 직접 객체를
+생성하는 대신, 필수 매개변수만으로 생성자를 호출해 빌더 객체를 얻고, 빌더 객체의 메서드들을 호출해 선택적 매개변수들을 
+설정한다. 마지막으로 `build` 메서드를 호출해 최종적으로 객체를 생성한다.
+
+```java
+// User.java
+public class User {
+
+    public static class Builder {
+
+        private final Long id;
+        private final String name;
+        private final String email;
+
+        private String address = null;
+        private Long phoneNumber = null;
+
+        public Builder(Long id, String name, String email) {
+            this.id = id;
+            this.name = name;
+            this.email = email;
+        }
+
+        public Builder address(String address) {
+            this.address = address;
+            return this;
+        }
+
+        public Builder phoneNumber(Long phoneNumber) {
+            this.phoneNumber = phoneNumber;
+            return this;
+        }
+
+        public User build() {
+            return new User(this);
+        }
+    }
+
+    private final Long id;
+    private final String name;
+    private final String email;
+    private final String address;
+    private final Long phoneNumber;
+
+    private User(Builder builder) {
+        this.id = builder.id;
+        this.name = builder.name;
+        this.email = builder.email;
+        this.address = builder.address;
+        this.phoneNumber = builder.phoneNumber;
+    }
+}
+```
+
+```java
+    // main 에서의 호출
+    public static void main(String[] args) {
+        User user = new Builder(1L, "KIM", "KIM@email.com")
+            .address("ADDRESS")
+            .phoneNumber(821012345678L)
+            .build();
+    }
+```
+
+`빌더패턴` 은 빌더 자신을 반환함으로써 연쇄적으로 메서드를 호출하는 방식으로 쓸 수 있다. 이런 메서드 호출 방식을
+`플루언트API(fluent API)` 혹은 `메서드 연쇄(method chaining)` 라고 한다.
+
+`빌더패턴` 은  
+
+1. 쓰기 쉽고, 읽기 쉽다.
+2. 불변 객체를 생성할 수 있다.
+3. **계층적으로 설계된 클래스와 함께 쓰기에 좋다.**
+
+[계층적으로 설계된 클래스에 적용 예시](https://github.com/jbloch/effective-java-3e-source-code/tree/master/src/effectivejava/chapter2/item2/hierarchicalbuilder)
+
+의 장점을 갖지만 각 클래스의 빌더를 정의 및 생성이 필요하기 때문에 코드를 추가적으로 작성하고,
+자원을 추가로 사용한다는 단점도 존재한다. 하지만, 생성자나 정적 팩터리 방식을 택했다가,
+추후에 매개변수가 늘어난다면 수정해야 하는 부분이 많을 수 있다. 때문에 애초에 `빌더패턴` 으로 
+시작하는 것이 좋을 수 있다.
+
+> 생성자나 정적 팩터리가 처리할 매개변수가 많다면, 빌더 패턴을 선택하는게 낫다. 특히, 선택적
+> 매개변수의 개수가 많을 때 효율적이며 객체를 생성하기에 안전하고도 읽고 쓰기 간결한 좋은 방법이다.
+
+---
+
+# 모든 객체의 공통 메서드
+
+## 아이템 11. equals를 재정의하려거든 hashCode도 재정의하라
 
 > equals를 재정의한 클래스 모두에서 hashCode도 재정의해야 한다. 그렇지 않으면 hashCode 일반 규약을
 > 어기게 되어 해당 클래스의 인스턴스를 HashMap 이나 HashSet 같은 컬렉션의 원소로 사용할 때 문제를 일으킬 것이다.
 
-#### Object 명세의 규약
+### Object 명세의 규약
 - equals 비교에 사용되는 정보가 변경되지 않았다면, 애플리케이션이 실행되는 동안 그 객체의 hashCode 메서드는 몇 번을
 호출해도 일관되게 항상 같은 값을 반환해야 한다. 단, 애플리케이션을 다시 실행하면 값이 달라져도 상관없다.
 - equals(Object)가 두 객체를 같다고 판단했다면, 두 객체의 hashCode는 똑같은 값을 반환해야 한다.
@@ -78,7 +233,7 @@
 `equals`를 재정의 하여 물리적으로 서로 다른 객체가 같은 객체를 논리적으로 같은 객체로 취급할 수 있다.
 이 때 같은 객체로 판단된 두 객체의 `hashCode` 가 다르다면, 위의 Object 명세 규약 2번째 조항을 어기게 된다.
 
-#### equals만 재정의가 될 경우 일어나는 문제
+### equals만 재정의가 될 경우 일어나는 문제
 
 ```java
     Map<User, String> usersNickname = new HashMap<>();
@@ -99,22 +254,22 @@ IDE가 지원하는 기능으로 `hashCode`를 쉽게 재정의 할 수 있으�
 
 ---
 
-## 일반적인 프로그래밍 원칙
+# 일반적인 프로그래밍 원칙
 
-### 아이템 61. 박싱된 기본 타입보다는 기본 타입을 사용하라
+## 아이템 61. 박싱된 기본 타입보다는 기본 타입을 사용하라
 
 자바의 데이터 타입을 크게 두 가지로 나눌 수 있다. `int`, `double`, `boolean` 등과 같은 기본 타입과 
 `String`, `List` 와 같은 참조 타입이다. 각각의 기본 타입은 대응하는 참조 타입을 가지고 있다. 이를 `박싱된 기본 타입` 이라고 부른다.
 오토박싱, 오토언박싱 덕분에 박싱타입과 기본 타입을 사용하는데 크게 구분이 필요하지 않지만, 분명한 차이가 존재하기 때문에 어떤 타입을 사용하는지 상당히 중요하다.
 
-#### 박싱된 기본 타입과 기본 타입의 차이
+### 박싱된 기본 타입과 기본 타입의 차이
 
 1. 기본 타입은 값만 가지고 있지만, 박싱된 기본 타입은 값과 식별성이라는 속성을 갖는다.
    - `Integer i = new Integer(42)` 와 `Integer j = new Integer(42)` 에서 i, j 는 같은 값이지만, 다른 개체라는 이야기다.
 2. 기본 타입의 값은 언제나 유효하나, 박싱된 기본 타입은 `null` 을 가질 수 있다.
 3. 기본 타입이 메모리 사용면에서 더 효율적이다.
 
-#### 박싱된 기본 타입의 값 비교
+### 박싱된 기본 타입의 값 비교
 
 ```java
     Comparator<Integer> naturalOrder = (i, j) -> (i < j) ? -1 : (i == j ? 0 : 1);
