@@ -6,6 +6,7 @@
   - 아이템 3. private 생성자나 열거타입으로 싱글턴임을 보증하라
   - 아이템 4. 인스턴스화를 막으려거든 private 생성자를 사용하라
   - 아이템 5. 자원을 직접 명시하지 말고 의존 객체 주입을 사용하라
+  - 아이템 6. 불필요한 객체 생성을 피하라
 - [모든 객체의 공통 메서드](#모든-객체의-공통-메서드)
   - 아이템 11. equals를 재정의하려거든 hashCode도 재정의하라
 - [일반적인 프로그래밍 원칙](#일반적인-프로그래밍-원칙)
@@ -350,6 +351,60 @@ class SpellChecker {
 
 > 클래스 내부적으로 하나 이상의 자원에 의존하고, 그 자원이 클래스 동작에 영향을 주는 경우 싱글턴과 정적 유틸리티 클래스는 사용하지 않는 것이 좋다. 대신 생성자 또는 빌더에 필요한 자원을 넘기는 의존 객체 주입 방식을 사용하자. 클래스의 유연성, 재사용성, 테스트 용이성을 개선해준다.
 
+---
+
+## 아이템 6. 불필요한 객체 생성을 피하라
+
+똑같은 기능을 하는 객체를 여러 번 생성하기 보다 하나의 객체로 재사용하는 것이 좋다. 특히 불변 객체는 언제든 재사용이 가능하다. 
+
+### String, Boolean에서의 재활용
+
+1. `String s = new String("hello"); // 실행시마다 새로운 인스턴스가 생성된다.`
+2. `String s = "hello"; // 여러번 실행하더라도 하나의 String 인스턴스를 사용한다.`
+
+2번 방법은 같은 가상 머신 안에서 이와 똑같은 문자열 리터럴을 사용하는 모든 코드가 같은 객체를 재사용함이 보
+장된다. 문자열이 아닌 `Boolean`의 경우에도 `new Boolean();` 으로 생성한다면 매번 새로운 객체가 생성된다. (이 방법은 자바9에서 deprecated 됐다.) 대신 `Boolean.valueOf();` 방식으로 생성한다면, 
+
+```java
+public final class Boolean implements java.io.Serializable,  
+                                      Comparable<Boolean>  
+{
+	public static final Boolean TRUE = new Boolean(true);  
+	public static final Boolean FALSE = new Boolean(false);
+
+	public static Boolean valueOf(String s) {
+		return parseBoolean(s) ? TRUE : FALSE;
+	}
+}
+```
+
+매번 새로운 객체를 반환하는 것이 아니라 이미 생성된 불변 객체를 반환하는 것으로 재사용한다.
+
+### 정규식에서의 재활용
+
+```java
+static boolean isPasswordRegex(String s) {
+	return s.mathces(
+	"^(?=.*[A-Za-z])(?=.*\\d)(?=.*[@$!%*#?&])[A-Za-z\\d@$!%*#?&]{8,}$");
+}
+```
+
+위의 방식에는 문제점이 있는데, `String.matches()` 메서드를 사용하는 것이다. 이 메서드는 내부적으로 `Pattern` 인스턴스를 생성하고 사용한다. 한 번 사용된 `Pattern` 인스턴스는 재사용 되지 않고 버려진다. 이는 인스턴스 생성 비용이 높기 때문에 효율적이지 못하다. 때문에 이 인스턴스를 재사용 할 수 있도록 하는 것이 좋다.
+
+```java
+class Matcher {
+	private static final Pattern PASSWORD = 
+	"^(?=.*[A-Za-z])(?=.*\\d)(?=.*[@$!%*#?&])[A-Za-z\\d@$!%*#?&]{8,}$"
+
+	static boolean isPasswordRegex(String s) {
+		return PASSWORD.matchers(s).matches();
+	}
+}
+```
+
+이 방법은 성능의 개선도 눈에 띄게 좋아지지만 내부적으로만 생성되고 사용되던 `Pattern`을 밖으로 끄집어내 코드도 더 명확해지는 효과를 가지고 있다.
+
+> 이번 아이템을 "객체 생성은 비싸니 피해야 한다."로 받아들이면 안된다. 일반적으로 객체의 생성을 피하는 것이 좋긴 하지만, 사실 요즘의 JVM에서는 단순하게 객체를 생성하고 회수하는 것으로 성능에서 큰 이슈가 되지 않는다. 객체를 재사용 하지 않더라도 성능에 조그만 차이만 있을 뿐 기능상으로는 문제가 되지 않는다. 재사용을 위해서 기능에 문제가 생긴다면, 문제가 훨씬 크다.
 
 ---
 
