@@ -7,6 +7,7 @@
   - 아이템 4. 인스턴스화를 막으려거든 private 생성자를 사용하라
   - 아이템 5. 자원을 직접 명시하지 말고 의존 객체 주입을 사용하라
   - 아이템 6. 불필요한 객체 생성을 피하라
+  - 아이템 7. 다 쓴 객체 참조를 해제하라
 - [모든 객체의 공통 메서드](#모든-객체의-공통-메서드)
   - 아이템 11. equals를 재정의하려거든 hashCode도 재정의하라
 - [일반적인 프로그래밍 원칙](#일반적인-프로그래밍-원칙)
@@ -405,6 +406,62 @@ class Matcher {
 이 방법은 성능의 개선도 눈에 띄게 좋아지지만 내부적으로만 생성되고 사용되던 `Pattern`을 밖으로 끄집어내 코드도 더 명확해지는 효과를 가지고 있다.
 
 > 이번 아이템을 "객체 생성은 비싸니 피해야 한다."로 받아들이면 안된다. 일반적으로 객체의 생성을 피하는 것이 좋긴 하지만, 사실 요즘의 JVM에서는 단순하게 객체를 생성하고 회수하는 것으로 성능에서 큰 이슈가 되지 않는다. 객체를 재사용 하지 않더라도 성능에 조그만 차이만 있을 뿐 기능상으로는 문제가 되지 않는다. 재사용을 위해서 기능에 문제가 생긴다면, 문제가 훨씬 크다.
+
+---
+
+## 아이템 7. 다 쓴 객체 참조를 해제하라
+
+자바는 가비지 컬렉터의 존재로 메모리 관리에 신경을 쓰지 않아도 된다고 느껴질 수 있지만 그렇지 않다. 아래는 책에서 제시하는 `Stack` 코드이다. 
+
+```java
+public class Stack {
+	private Object[] elements;
+	private int size = 0;
+	private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+	public Stack() {
+		elements = new Object[DEFAULT_INITIAL_CAPACITY];
+	}
+
+	public void push(Object e) {
+		ensureCapacity();
+		elements[size++] = e;
+	}
+
+	public Object pop() {
+		if (size == 0) {
+			throw new EmptyStackException();
+		}
+		return elements[--size];
+	}
+
+	/**
+	* 배열의 크기를 늘릴 필요가 있을 때 2배씩 늘린다.
+	*/
+	private void ensureCapacity() {
+		if (elements.length == size) {
+			elements = Arrays.copyOf(elements, 2 * size + 1);
+		}
+	}
+}
+```
+
+사용에 문제는 없겠지만 '메모리 누수'의 문제를 가지고 있다. 이 코드의 스택에서 꺼내진 객체들은 가비지컬렉터가 회수하지 않는다. 이 스택이 그 객체들의 다 쓴 참조(obsolete reference)를 가지고 있기 때문이다. 위의 케이스에서는 해당 참조를 다 썼을 때 null 처리를 해주는 것으로 해결이 가능하다.
+
+```java
+public Object pop() {
+	if (size == 0) {
+		throw new EmptyStackException();
+	}
+	Object result = elements[--size];
+	elements[size] = null; // 참조 해제
+	return result;
+}
+```
+
+객체의 참조를 해제 시키는 것 말고도 null 처리를 함으로써 추후 해당 참조를 실수로라도 사용하게 되면 `NullPointerException`이 던져지는 이점을 가지고 있다. 
+
+>자기 메모리를 직접 관리하는 클래스라면 프로므래머는 항시 메모리 누수에 주의해야 한다. 캐시 역시 메모리 누수를 일으키는 주범이다. 
 
 ---
 
