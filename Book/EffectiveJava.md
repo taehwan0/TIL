@@ -8,6 +8,7 @@
   - 아이템 5. 자원을 직접 명시하지 말고 의존 객체 주입을 사용하라
   - 아이템 6. 불필요한 객체 생성을 피하라
   - 아이템 7. 다 쓴 객체 참조를 해제하라
+  - 아이템 9. try-finally 보다는 try-with-resource 를 사용하라
 - [모든 객체의 공통 메서드](#모든-객체의-공통-메서드)
   - 아이템 11. equals를 재정의하려거든 hashCode도 재정의하라
 - [일반적인 프로그래밍 원칙](#일반적인-프로그래밍-원칙)
@@ -462,6 +463,89 @@ public Object pop() {
 객체의 참조를 해제 시키는 것 말고도 null 처리를 함으로써 추후 해당 참조를 실수로라도 사용하게 되면 `NullPointerException`이 던져지는 이점을 가지고 있다. 
 
 >자기 메모리를 직접 관리하는 클래스라면 프로므래머는 항시 메모리 누수에 주의해야 한다. 캐시 역시 메모리 누수를 일으키는 주범이다. 
+
+---
+
+## 아이템 9. try-finally 보다는 try-with-resource 를 사용하라
+
+`InputStream`, `OutputStream`, `java.sql.Connection` 등의 자원처럼 `close` 메서드를 호출하여 직접 닫아줘야 하는 경우가 많다. 이는  성능 문제가 발생할 수 있지만 놓치기 쉬운 부분이다. 따라서 `finalizer` 로 대비하기는 하나 `finalizer` 는 실행이 완전히 보장되지 않아 위험하다.
+
+### try-finally
+
+가장 전통적인 방법은 `try-finally` 방법이다. 
+
+```java
+static String readLineOfFile(String path) throws IOException {
+	BufferedReader br = new BufferedReader(new FileReader(path));
+	try {
+		return br.readLine();
+	} finally {
+		br.close();
+	}
+}
+```
+
+이 방법은 나쁘지 않지만, 자원이 둘 이상으로 늘어난다면
+
+```java
+static void copy(String src, String dst) throws IOException {
+	InputStream in = new FileInputStream(src);
+	try {
+		OutputStream out = new FileOutputStream(dst);
+		try {
+			byte[] buf = new byte[BUFFER_SIZE];
+			int n;
+			while ((n = in.read(buf)) >= 0) {
+				out.write(buf, 0, n);
+			}
+		} finally {
+			out.close();
+		}
+	} finally {
+		in.close();
+	}
+}
+```
+
+난잡한 코드가 되어버린다. 또한 `try`, `finally` 블록 모두에서 예외가 발생할 가능성이 있는데 물리적인 문제로  두 블록에서 모두 예외가 발생한다면 두 번째 예외가 첫 번째 예외를 집어삼켜버려 스택을 추척해도 첫 번째 예외에 관한 정보가 남지 않는다.
+
+## try-with-resource
+
+자바7 에서는 `try-with-resource` 로 위와 같은 문제점을 해결한다. 이 구조는 `AutoCloseable` 인터페이스를 구현하는 것을 조건으로 한다. `InputStream` 과 같은 클래스에서 `Closeable` 을 구현하고 있다. (`Closeable` 은 `AutoCloseable` 을 상속한다.)
+
+```java
+public abstract class InputStream implements Closeable {
+	...
+}
+```
+
+`Closeable`(`AutoCloseable`) 인터페이스는 반환 값이 없는 `close()` 메서드를 정의하고 있다. 여기에 자원의 사용을 닫는 구현을 필요로 한다. 위의 코드들에 `try-with-resource` 를 적용하면,
+
+```java
+static String readLineOfFile(String path) throws IOException {
+	try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+		return br.readLine();
+	}
+}
+```
+
+```java
+static void copy(String src, String dst) throws IOException {
+	
+	try (InputStream in = new FileInputStream(src);
+		OutputStream out = new FileOutputStream(dst)){
+		byte[] buf = new byte[BUFFER_SIZE];
+		int n;
+		while ((n = in.read(buf)) >= 0) {
+			out.write(buf, 0, n);
+		}
+	}
+}
+```
+
+훨씬 간결하고 가독성이 좋은 코드가 된다. 심지어 `catch` 절을 사용할 수 있기 때문에 `try-finally` 에 비해 예외 처리에 유용하다. 또한 `try()` 안의 자원들은 메서드 종료 후 `close()` 가 자동 호출되기 때문에 자원 관리에도 효율적이다.
+
+>회수해야 하는 자원을 다룰 때는 try-with-resource 를 사용하는 것이 좋다. 이 케이스에 예외는 없다. 코드가 더 간결하고 분명해지며, 예외 정보도 훨씬 유용하며, 자원을 회수하기도 용이하다.
 
 ---
 
