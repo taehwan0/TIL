@@ -509,7 +509,7 @@ static void copy(String src, String dst) throws IOException {
 
 난잡한 코드가 되어버린다. 또한 `try`, `finally` 블록 모두에서 예외가 발생할 가능성이 있는데 물리적인 문제로  두 블록에서 모두 예외가 발생한다면 두 번째 예외가 첫 번째 예외를 집어삼켜버려 스택을 추척해도 첫 번째 예외에 관한 정보가 남지 않는다.
 
-## try-with-resource
+### try-with-resource
 
 자바7 에서는 `try-with-resource` 로 위와 같은 문제점을 해결한다. 이 구조는 `AutoCloseable` 인터페이스를 구현하는 것을 조건으로 한다. `InputStream` 과 같은 클래스에서 `Closeable` 을 구현하고 있다. (`Closeable` 은 `AutoCloseable` 을 상속한다.)
 
